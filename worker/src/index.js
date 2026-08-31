@@ -12,12 +12,12 @@ function corsHeaders() {
   };
 }
 
-function json(payload, status = 200) {
+function json(payload, status = 200, cacheControl = 'public, max-age=300') {
   return new Response(JSON.stringify(payload, null, 2), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=300',
+      'Cache-Control': cacheControl,
       ...corsHeaders(),
     },
   });
@@ -140,8 +140,10 @@ export default {
 
     if (url.pathname === '/api/tasas/refresh') {
       // Endpoint manual para forzar un refresco (útil para probar en desarrollo).
+      // no-store: esta respuesta nunca debe servirse desde caché del
+      // navegador, porque su único propósito es traer un dato nuevo de verdad.
       const fresh = await refreshRates(env);
-      return json(fresh);
+      return json(fresh, 200, 'no-store');
     }
 
     return json({ error: 'Ruta no encontrada' }, 404);

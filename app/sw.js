@@ -1,7 +1,7 @@
 // Subir este numero cada vez que cambie index.html, manifest.json o los
 // estilos/scripts inline, o el telefono va a seguir mostrando la version
 // vieja aunque el archivo ya haya cambiado en el servidor.
-var CACHE_NAME = 'dolaraldia-shell-v1';
+var CACHE_NAME = 'dolaraldia-shell-v2';
 
 var SHELL_FILES = [
   './',

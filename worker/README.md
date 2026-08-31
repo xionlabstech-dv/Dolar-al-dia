@@ -79,21 +79,24 @@ puede decidir si avisa al usuario que el dato está desactualizado.
 Útil para probar en desarrollo; no lo expongas como botón público porque
 cada llamada le pega directo a BCV y Binance.
 
-## Riesgo conocido: Binance P2P
+## Fuente de USDT: Cotizave
 
-El endpoint que se usa para USDT (`p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search`)
-no es oficial — no tiene documentación de Binance, se arma a partir de lo que
-usan otros proyectos de la comunidad. Dos cosas pueden pasar con el tiempo:
+El Worker ya no le pega directo a `p2p.binance.com` para el USDT: ese
+endpoint no es oficial, no tiene documentación de Binance, y Binance bloquea
+las IPs de datacenter (las de Cloudflare Workers entran en esa categoría)
+con HTTP 403 — agregar headers de navegador no lo resolvió.
 
-1. Binance cambia la forma de la respuesta sin avisar.
-2. Binance bloquea o limita las IPs de datacenter (las de Cloudflare Workers
-   entran en esa categoría) más agresivo que las IPs residenciales.
+En su lugar, `fetchUSDT()` llama a [Cotizave](https://cotizave.com), un
+agregador con API documentada que ya resuelve ese bloqueo y expone el precio
+de Binance P2P (`market: "binance_p2p"`) sin que el Worker tenga que hablar
+con Binance directamente.
 
-Si `usdt_ok` empieza a salir `false` seguido en producción, la solución no es
-tocar el resto del Worker — es cambiar `fetchBinanceP2P()` por una llamada a
-un agregador público que ya resuelve esto (cotizave.com o pydolarve.org
-tienen planes gratuitos con USDT/VES). El resto del sistema (caché, CORS,
-fallback, contrato de la API) queda igual.
+Esto requiere un secret `COTIZAVE_API_KEY` configurado en el Worker
+(`npx wrangler secret put COTIZAVE_API_KEY`), fuera del código y de este
+repo. Sin ese secret, `fetchUSDT()` falla y el Worker cae al último valor
+bueno en caché, igual que con cualquier otra falla de fuente (`usdt_ok:
+false` + `usdt_error`). El resto del sistema (caché, CORS, fallback,
+contrato de la API) queda igual.
 
 ## Cron
 

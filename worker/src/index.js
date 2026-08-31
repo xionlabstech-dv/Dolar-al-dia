@@ -57,59 +57,32 @@ async function fetchBCV() {
   };
 }
 
-// --- USDT P2P (Binance) ---
-// OJO: este endpoint no es oficial ni está documentado por Binance, se arma a partir
-// de lo que se observa en el tráfico de la app/web de P2P. Puede cambiar de forma
-// o bloquear IPs de datacenter (como las de Cloudflare Workers) sin aviso.
-// Si en producción empieza a fallar seguido, la salida es cambiar esta función
-// por un agregador público (cotizave.com, pydolarve.org) sin tocar el resto del Worker.
-async function fetchBinanceAds(tradeType) {
+// --- USDT P2P (Binance, vía Cotizave) ---
+// Antes le pegábamos directo a p2p.binance.com, pero Binance bloquea las IPs
+// de datacenter (como las de Cloudflare Workers) con HTTP 403, y agregar
+// headers de navegador no lo resolvió. Ahora usamos Cotizave (cotizave.com),
+// un agregador con API documentada que ya resuelve ese bloqueo, y que
+// requiere el secret COTIZAVE_API_KEY configurado en el Worker.
+async function fetchUSDT(env) {
   const data = await fetchWithTimeout(
-    'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
+    'https://api.cotizave.com/v1/fx/rates',
     {
-      method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://p2p.binance.com/en/trade/all-payments/USDT?fiat=VES',
-        'Origin': 'https://p2p.binance.com',
-        'clienttype': 'web',
+        'X-API-Key': env.COTIZAVE_API_KEY,
+        'Accept': 'application/json',
       },
-      body: JSON.stringify({
-        page: 1,
-        rows: 10,
-        payTypes: [],
-        asset: 'USDT',
-        tradeType,
-        fiat: 'VES',
-        publisherType: null,
-        merchantCheck: false,
-      }),
     },
     8000
   );
 
-  const ads = (data.data || [])
-    .map((item) => Number(item.adv.price))
-    .filter((price) => Number.isFinite(price));
+  const binance = (data.rates || []).find((r) => r.market === 'binance_p2p');
+  if (!binance) throw new Error('Cotizave no devolvio el mercado binance_p2p');
 
-  if (!ads.length) throw new Error(`Sin anuncios de USDT/VES (${tradeType})`);
-
-  const top = ads.slice(0, 5);
-  const avg = top.reduce((sum, p) => sum + p, 0) / top.length;
-  return Math.round(avg * 100) / 100;
-}
-
-async function fetchBinanceP2P() {
-  const [compra, venta] = await Promise.all([
-    fetchBinanceAds('BUY'),
-    fetchBinanceAds('SELL'),
-  ]);
   return {
-    compra,
-    venta,
-    promedio: Math.round(((compra + venta) / 2) * 100) / 100,
-    fuente: 'Binance P2P (no oficial)',
+    compra: binance.ask,
+    venta: binance.bid,
+    promedio: binance.mid,
+    fuente: 'Cotizave (Binance P2P)',
   };
 }
 
@@ -122,7 +95,7 @@ async function getCached(env) {
 async function refreshRates(env) {
   const [bcvResult, usdtResult] = await Promise.allSettled([
     fetchBCV(),
-    fetchBinanceP2P(),
+    fetchUSDT(env),
   ]);
 
   const previous = await getCached(env);

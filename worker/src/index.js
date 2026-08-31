@@ -68,7 +68,13 @@ async function fetchBinanceAds(tradeType) {
     'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://p2p.binance.com/en/trade/all-payments/USDT?fiat=VES',
+        'Origin': 'https://p2p.binance.com',
+        'clienttype': 'web',
+      },
       body: JSON.stringify({
         page: 1,
         rows: 10,

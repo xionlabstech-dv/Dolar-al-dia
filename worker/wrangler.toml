@@ -6,7 +6,7 @@ compatibility_date = "2026-08-01"
 # wrangler kv namespace create RATES_KV
 [[kv_namespaces]]
 binding = "RATES_KV"
-id = "PEGA_AQUI_TU_KV_NAMESPACE_ID"
+id = "89925570929c4b25b4bff9e1e1d23745"
 
 # Refresca BCV + USDT cada 15 minutos.
 [triggers]

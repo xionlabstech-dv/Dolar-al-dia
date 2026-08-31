@@ -1,0 +1,24 @@
+{
+  "name": "Dólar al Día",
+  "short_name": "Dólar al Día",
+  "description": "Convierte entre dólares y bolívares con la tasa oficial BCV, sin publicidad.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0F1310",
+  "theme_color": "#0F1310",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

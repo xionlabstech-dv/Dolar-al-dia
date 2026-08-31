@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Dólar al Día</title>
+<meta name="description" content="Convierte entre dólares y bolívares con la tasa oficial BCV, sin publicidad." />
+
+<link rel="manifest" href="./manifest.json" />
+<meta name="theme-color" content="#0F1310" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Dólar al Día" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --bg: #0F1310;
+    --surface: #171D18;
+    --surface-2: #1F2620;
+    --line: #2A332B;
+    --text: #F1EFE6;
+    --muted: #8B948B;
+    --accent: #E3A857;
+    --accent-dim: #6B5530;
+    --alert: #D1574A;
+    --ok: #7FA86B;
+
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --sans: -apple-system, 'Inter', system-ui, sans-serif;
+    --display: 'Space Grotesk', var(--sans);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+
+  .app{
+    width: 100%;
+    max-width: 440px;
+  }
+
+  .eyebrow{
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+
+  h1{
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 18px;
+  }
+
+  .pill{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: var(--accent);
+    color: #171200;
+    border: none;
+    border-radius: 20px;
+    padding: 11px 16px;
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .amount-card{
+    margin-bottom: 2px;
+  }
+
+  .amount-card + .amount-card{
+    margin-top: 2px;
+  }
+
+  .amount-label{
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+
+  .amount-row{
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .amount-row input{
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--mono);
+    font-size: 26px;
+    color: var(--text);
+    padding: 0;
+    -moz-appearance: textfield;
+  }
+
+  .amount-row input::placeholder{
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  .amount-row input::-webkit-outer-spin-button,
+  .amount-row input::-webkit-inner-spin-button{
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  #usdCard .amount-row input{ color: var(--accent); }
+
+  .copy-btn{
+    background: none;
+    border: none;
+    padding: 6px;
+    margin: -6px;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 8px;
+    line-height: 0;
+  }
+
+  .copy-btn:hover{ color: var(--text); }
+  .copy-btn.copied{ color: var(--ok); }
+
+  .copy-btn svg{ width: 17px; height: 17px; }
+
+  .swap-divider{
+    display: flex;
+    justify-content: center;
+    margin: -2px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .swap-divider span{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+  }
+
+  .swap-divider svg{ width: 16px; height: 16px; transform: rotate(90deg); }
+
+  .actions-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+  }
+
+  .chip{
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 0;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .chip:active{ transform: scale(0.97); }
+
+  .chip.active{
+    background: var(--surface);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .clear-btn{
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 9px 12px;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .clear-btn svg{ width: 14px; height: 14px; }
+
+  .refs{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .ref-card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .ref-card .amount-label{ margin-bottom: 6px; }
+
+  .ref-value{
+    font-family: var(--mono);
+    font-size: 17px;
+  }
+
+  .status{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-2);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+
+  .status-text{
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .status-text.alert{ color: var(--alert); }
+
+  .status svg{ width: 15px; height: 15px; color: var(--accent); flex-shrink: 0; }
+
+  .footnote{
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 14px 2px 0;
+  }
+
+  .footnote b{ color: var(--text); font-weight: 500; }
+
+  :focus-visible{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <p class="eyebrow">Tasa en vivo</p>
+  <h1>Dólar al día</h1>
+
+  <div class="pill" id="sourcePill">
+    <span>Dólar BCV</span>
+  </div>
+
+  <div class="card amount-card" id="usdCard">
+    <p class="amount-label">Dólares</p>
+    <div class="amount-row">
+      <input type="text" inputmode="decimal" id="usdInput" placeholder="0" autocomplete="off" />
+      <button class="copy-btn" data-copy="usdInput" aria-label="Copiar monto en dólares">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="swap-divider">
+    <span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+    </span>
+  </div>
+
+  <div class="card amount-card" id="bsCard">
+    <p class="amount-label">Bolívares</p>
+    <div class="amount-row">
+      <input type="text" inputmode="decimal" id="bsInput" placeholder="0" autocomplete="off" />
+      <button class="copy-btn" data-copy="bsInput" aria-label="Copiar monto en bolívares">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="actions-row">
+    <button class="chip" data-amount="2">2</button>
+    <button class="chip" data-amount="5">5</button>
+    <button class="chip" data-amount="10">10</button>
+    <button class="chip" data-amount="20">20</button>
+    <button class="chip" data-amount="50">50</button>
+    <button class="clear-btn" id="clearBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8l-6-6a2 2 0 0 1 0-2.83l9-9a2 2 0 0 1 2.83 0l7 7a2 2 0 0 1 0 2.83L15 18"/></svg>
+      Limpiar
+    </button>
+  </div>
+
+  <div class="refs">
+    <div class="ref-card">
+      <p class="amount-label">Euro (BCV)</p>
+      <p class="ref-value" id="eurValue">—</p>
+    </div>
+    <div class="ref-card">
+      <p class="amount-label">USDT (promedio)</p>
+      <p class="ref-value" id="usdtValue">—</p>
+    </div>
+  </div>
+
+  <div class="status">
+    <span class="status-text" id="statusText">Cargando tasa…</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+  </div>
+
+  <p class="footnote">Tasa oficial <b>BCV</b> vía la infraestructura de Xion Labs. Sin publicidad, sin cuentas. Si no hay internet, se muestra el último dato guardado en este teléfono.</p>
+
+</div>
+
+<script>
+(function () {
+  var API_URL = 'https://dolar-al-dia-api.xionlabstech.workers.dev/api/tasas';
+  var STORAGE_KEY = 'dolaraldia:lastRate';
+
+  var usdInput = document.getElementById('usdInput');
+  var bsInput = document.getElementById('bsInput');
+  var statusText = document.getElementById('statusText');
+  var eurValue = document.getElementById('eurValue');
+  var usdtValue = document.getElementById('usdtValue');
+  var clearBtn = document.getElementById('clearBtn');
+  var chips = document.querySelectorAll('.chip');
+
+  var state = {
+    usd: null,
+    eur: null,
+    usdt: null,
+    fecha: null,
+    lastEdited: 'usd'
+  };
+
+  function fmtBs(value) {
+    return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  }
+
+  function fmtUsd(value) {
+    return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  }
+
+  function fmtFecha(iso) {
+    try {
+      var d = new Date(iso);
+      return new Intl.DateTimeFormat('es-VE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(d);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setStatus(text, isAlert) {
+    statusText.textContent = text;
+    statusText.classList.toggle('alert', !!isAlert);
+  }
+
+  function recompute(source) {
+    if (!state.usd) return;
+    if (source === 'usd') {
+      var usdVal = parseFloat(usdInput.value.replace(',', '.'));
+      if (Number.isFinite(usdVal)) {
+        bsInput.value = fmtBs(usdVal * state.usd);
+      } else {
+        bsInput.value = '';
+      }
+    } else {
+      var bsVal = parseFloat(bsInput.value.replace(',', '.'));
+      if (Number.isFinite(bsVal)) {
+        usdInput.value = fmtUsd(bsVal / state.usd);
+      } else {
+        usdInput.value = '';
+      }
+    }
+  }
+
+  usdInput.addEventListener('input', function () {
+    state.lastEdited = 'usd';
+    recompute('usd');
+  });
+
+  bsInput.addEventListener('input', function () {
+    state.lastEdited = 'bs';
+    recompute('bs');
+  });
+
+  [usdInput, bsInput].forEach(function (el) {
+    el.addEventListener('focus', function () { el.select(); });
+  });
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chips.forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      usdInput.value = chip.getAttribute('data-amount');
+      state.lastEdited = 'usd';
+      recompute('usd');
+    });
+  });
+
+  clearBtn.addEventListener('click', function () {
+    usdInput.value = '';
+    bsInput.value = '';
+    chips.forEach(function (c) { c.classList.remove('active'); });
+    usdInput.focus();
+  });
+
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var targetId = btn.getAttribute('data-copy');
+      var value = document.getElementById(targetId).value;
+      if (!value) return;
+      navigator.clipboard.writeText(value).then(function () {
+        btn.classList.add('copied');
+        setTimeout(function () { btn.classList.remove('copied'); }, 900);
+      }).catch(function () {});
+    });
+  });
+
+  function applyRate(data, isFresh) {
+    state.usd = data.usd;
+    state.eur = data.eur;
+    state.usdt = data.usdt;
+    state.fecha = data.fecha;
+
+    eurValue.textContent = data.eur ? fmtBs(data.eur) : '—';
+    usdtValue.textContent = data.usdt ? fmtBs(data.usdt) : '—';
+
+    recompute(state.lastEdited);
+
+    var fechaTxt = data.fecha ? fmtFecha(data.fecha) : '';
+    if (isFresh) {
+      setStatus('BCV actualizado · ' + fechaTxt, false);
+    } else {
+      setStatus('Sin conexión · último dato: ' + fechaTxt, true);
+    }
+  }
+
+  function loadCached() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveCache(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+
+  var cached = loadCached();
+  if (cached) {
+    applyRate(cached, false);
+  }
+
+  var controller = new AbortController();
+  var timeout = setTimeout(function () { controller.abort(); }, 8000);
+
+  fetch(API_URL, { signal: controller.signal })
+    .then(function (res) {
+      clearTimeout(timeout);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function (json) {
+      if (!json.bcv || !json.bcv.usd) throw new Error('Respuesta sin tasa BCV');
+      var data = {
+        usd: json.bcv.usd,
+        eur: json.bcv.eur,
+        usdt: json.usdt ? json.usdt.promedio : null,
+        fecha: json.bcv.fecha
+      };
+      saveCache(data);
+      applyRate(data, true);
+    })
+    .catch(function () {
+      clearTimeout(timeout);
+      if (!cached) {
+        setStatus('No se pudo cargar la tasa. Revisa tu conexión.', true);
+      }
+    });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>

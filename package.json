@@ -1,0 +1,14 @@
+{
+  "name": "dolar-al-dia-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Worker central de tasas (BCV + USDT P2P) para los productos de Xion Labs",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

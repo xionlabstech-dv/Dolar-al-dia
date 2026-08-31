@@ -1,0 +1,13 @@
+name = "dolar-al-dia-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Reemplaza el id con el que te da:
+# wrangler kv namespace create RATES_KV
+[[kv_namespaces]]
+binding = "RATES_KV"
+id = "PEGA_AQUI_TU_KV_NAMESPACE_ID"
+
+# Refresca BCV + USDT cada 15 minutos.
+[triggers]
+crons = ["*/15 * * * *"]

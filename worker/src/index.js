@@ -75,11 +75,8 @@ async function fetchUSDT(env) {
     8000
   );
 
-  const binance = (data.rates || []).find((r) => r.market === 'binance_p2p');
-  if (!binance) {
-    const disponibles = JSON.stringify(data);
-    throw new Error(`Cotizave no devolvio binance_p2p. Respuesta completa: ${disponibles}`);
-  }
+  const binance = (data.rates || []).find((r) => r.market === 'binance');
+  if (!binance) throw new Error('Cotizave no devolvio el mercado binance');
 
   return {
     compra: binance.ask,

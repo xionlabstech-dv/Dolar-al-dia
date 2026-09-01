@@ -103,9 +103,21 @@ async function refreshRates(env) {
   const bcv = bcvResult.status === 'fulfilled' ? bcvResult.value : previous?.bcv ?? null;
   const usdt = usdtResult.status === 'fulfilled' ? usdtResult.value : previous?.usdt ?? null;
 
+  // Referencia: promedio entre BCV y USDT, y la brecha porcentual entre ambos.
+  // Solo se calcula si tenemos los dos valores; si falta alguno, queda null
+  // en vez de inventar un numero con datos parciales.
+  const referencia =
+    bcv && bcv.usd != null && usdt && usdt.promedio != null
+      ? {
+          promedio: Math.round(((bcv.usd + usdt.promedio) / 2) * 100) / 100,
+          brecha_pct: Math.round(((usdt.promedio - bcv.usd) / bcv.usd) * 10000) / 100,
+        }
+      : null;
+
   const payload = {
     bcv,
     usdt,
+    referencia,
     meta: {
       updated_at: new Date().toISOString(),
       bcv_ok: bcvResult.status === 'fulfilled',

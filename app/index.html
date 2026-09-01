@@ -328,7 +328,7 @@
 
   .sheet-title{
     font-family: var(--display);
-    font-size: 19px;
+    font-size: 21px;
     font-weight: 600;
     margin: 0;
   }
@@ -345,14 +345,35 @@
 
   .sheet-close svg{ width: 18px; height: 18px; }
 
+  .sheet-stat{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface-2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+  }
+
+  .sheet-stat-label{
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .sheet-stat-value{
+    font-family: var(--mono);
+    font-size: 16px;
+    color: var(--accent);
+  }
+
   .sheet-row{
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 13px 14px;
+    padding: 15px 16px;
     border-radius: 12px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     background: var(--surface-2);
     border: none;
     font-family: var(--sans);
@@ -363,11 +384,11 @@
 
   .sheet-row:last-child{ margin-bottom: 0; }
 
-  .sheet-row-label{ font-size: 14px; margin: 0; }
+  .sheet-row-label{ font-size: 15px; margin: 0; }
 
   .sheet-row-value{
     font-family: var(--mono);
-    font-size: 15px;
+    font-size: 16px;
     margin: 0;
   }
 
@@ -453,6 +474,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
       </button>
     </div>
+    <div class="sheet-stat">
+      <span class="sheet-stat-label">Brecha ($/USDT)</span>
+      <span class="sheet-stat-value" id="sheetBrecha">—</span>
+    </div>
     <button type="button" class="sheet-row" id="rowUsd" data-currency="usd">
       <span class="sheet-row-label">Dólar BCV</span>
       <span class="sheet-row-value" id="sheetBcv">—</span>
@@ -464,6 +489,10 @@
     <button type="button" class="sheet-row" id="rowUsdt" data-currency="usdt">
       <span class="sheet-row-label">USDT</span>
       <span class="sheet-row-value" id="sheetUsdt">—</span>
+    </button>
+    <button type="button" class="sheet-row" id="rowPromedio" data-currency="promedio">
+      <span class="sheet-row-label">Promedio</span>
+      <span class="sheet-row-value" id="sheetPromedio">—</span>
     </button>
   </div>
 </div>
@@ -478,7 +507,8 @@
   var CURRENCIES = {
     usd: { label: 'Dólar BCV', unitLabel: 'Dólares' },
     eur: { label: 'Euro', unitLabel: 'Euros' },
-    usdt: { label: 'USDT (promedio)', unitLabel: 'USDT' }
+    usdt: { label: 'USDT (promedio)', unitLabel: 'USDT' },
+    promedio: { label: 'Promedio', unitLabel: 'Promedio' }
   };
 
   var usdInput = document.getElementById('usdInput');
@@ -495,12 +525,15 @@
   var sheetBcv = document.getElementById('sheetBcv');
   var sheetEur = document.getElementById('sheetEur');
   var sheetUsdt = document.getElementById('sheetUsdt');
+  var sheetPromedio = document.getElementById('sheetPromedio');
+  var sheetBrecha = document.getElementById('sheetBrecha');
   var sheetRows = document.querySelectorAll('.sheet-row');
 
   var state = {
     usd: null,
     eur: null,
     usdt: null,
+    referencia: null,
     fecha: null,
     lastEdited: 'usd',
     activeCurrency: 'usd'
@@ -513,6 +546,9 @@
   var toastTimer = null;
 
   function getActiveRate() {
+    if (state.activeCurrency === 'promedio') {
+      return state.referencia ? state.referencia.promedio : null;
+    }
     return state[state.activeCurrency];
   }
 
@@ -522,6 +558,10 @@
 
   function fmtUsd(value) {
     return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  }
+
+  function fmtPct(value) {
+    return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) + '%';
   }
 
   function fmtFecha(iso) {
@@ -636,6 +676,8 @@
     sheetBcv.textContent = state.usd ? fmtBs(state.usd) + ' Bs' : '—';
     sheetEur.textContent = state.eur ? fmtBs(state.eur) + ' Bs' : '—';
     sheetUsdt.textContent = state.usdt ? fmtBs(state.usdt) + ' Bs' : '—';
+    sheetPromedio.textContent = state.referencia && state.referencia.promedio ? fmtBs(state.referencia.promedio) + ' Bs' : '—';
+    sheetBrecha.textContent = state.referencia && state.referencia.brecha_pct != null ? fmtPct(state.referencia.brecha_pct) : '—';
     updateSheetHighlight();
     sheetOverlay.classList.add('open');
   }
@@ -668,6 +710,7 @@
     state.usd = data.usd;
     state.eur = data.eur;
     state.usdt = data.usdt;
+    state.referencia = data.referencia || null;
     state.fecha = data.fecha;
 
     if (!hasUserInput) {
@@ -723,7 +766,8 @@
         usd: json.bcv.usd,
         eur: json.bcv.eur,
         usdt: json.usdt ? json.usdt.promedio : null,
-        fecha: json.bcv.fecha
+        fecha: json.bcv.fecha,
+        referencia: json.referencia || null
       };
       saveCache(data);
       applyRate(data, true);

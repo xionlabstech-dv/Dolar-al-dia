@@ -309,10 +309,12 @@
   .sheet{
     width: 100%;
     max-width: 440px;
+    max-height: 86vh;
+    overflow-y: auto;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 18px 18px 0 0;
-    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
     transform: translateY(12px);
     transition: transform .2s ease;
   }
@@ -322,7 +324,7 @@
   .sheet-header{
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 14px;
   }
 
@@ -331,6 +333,13 @@
     font-size: 21px;
     font-weight: 600;
     margin: 0;
+  }
+
+  .sheet-date{
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 0;
   }
 
   .sheet-close{
@@ -368,10 +377,9 @@
 
   .sheet-row{
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     width: 100%;
-    padding: 15px 16px;
+    padding: 14px 16px;
     border-radius: 12px;
     margin-bottom: 10px;
     background: var(--surface-2);
@@ -384,6 +392,12 @@
 
   .sheet-row:last-child{ margin-bottom: 0; }
 
+  .sheet-row-main{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .sheet-row-label{ font-size: 15px; margin: 0; }
 
   .sheet-row-value{
@@ -392,9 +406,22 @@
     margin: 0;
   }
 
+  .sheet-row-delta{
+    display: flex;
+    justify-content: flex-end;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .sheet-row-delta.up{ color: var(--ok); }
+  .sheet-row-delta.down{ color: var(--alert); }
+
   .sheet-row.highlight{ background: var(--accent); }
   .sheet-row.highlight .sheet-row-label{ color: #171200; font-weight: 500; }
   .sheet-row.highlight .sheet-row-value{ color: #171200; }
+  .sheet-row.highlight .sheet-row-delta{ color: #171200; opacity: 0.75; }
 
   :focus-visible{
     outline: 2px solid var(--accent);
@@ -469,7 +496,10 @@
 <div class="sheet-overlay" id="sheetOverlay">
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Monedas">
     <div class="sheet-header">
-      <p class="sheet-title">Monedas</p>
+      <div>
+        <p class="sheet-title">Monedas</p>
+        <p class="sheet-date" id="sheetDate">—</p>
+      </div>
       <button class="sheet-close" id="sheetClose" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
       </button>
@@ -479,20 +509,32 @@
       <span class="sheet-stat-value" id="sheetBrecha">—</span>
     </div>
     <button type="button" class="sheet-row" id="rowUsd" data-currency="usd">
-      <span class="sheet-row-label">Dólar BCV</span>
-      <span class="sheet-row-value" id="sheetBcv">—</span>
+      <div class="sheet-row-main">
+        <span class="sheet-row-label">Dólar BCV</span>
+        <span class="sheet-row-value" id="sheetBcv">—</span>
+      </div>
+      <div class="sheet-row-delta" id="sheetBcvDelta">—</div>
     </button>
     <button type="button" class="sheet-row" id="rowEur" data-currency="eur">
-      <span class="sheet-row-label">Euro</span>
-      <span class="sheet-row-value" id="sheetEur">—</span>
+      <div class="sheet-row-main">
+        <span class="sheet-row-label">Euro</span>
+        <span class="sheet-row-value" id="sheetEur">—</span>
+      </div>
+      <div class="sheet-row-delta" id="sheetEurDelta">—</div>
     </button>
     <button type="button" class="sheet-row" id="rowUsdt" data-currency="usdt">
-      <span class="sheet-row-label">USDT</span>
-      <span class="sheet-row-value" id="sheetUsdt">—</span>
+      <div class="sheet-row-main">
+        <span class="sheet-row-label">USDT</span>
+        <span class="sheet-row-value" id="sheetUsdt">—</span>
+      </div>
+      <div class="sheet-row-delta" id="sheetUsdtDelta">—</div>
     </button>
     <button type="button" class="sheet-row" id="rowPromedio" data-currency="promedio">
-      <span class="sheet-row-label">Promedio</span>
-      <span class="sheet-row-value" id="sheetPromedio">—</span>
+      <div class="sheet-row-main">
+        <span class="sheet-row-label">Promedio</span>
+        <span class="sheet-row-value" id="sheetPromedio">—</span>
+      </div>
+      <div class="sheet-row-delta" id="sheetPromedioDelta">—</div>
     </button>
   </div>
 </div>
@@ -527,6 +569,11 @@
   var sheetUsdt = document.getElementById('sheetUsdt');
   var sheetPromedio = document.getElementById('sheetPromedio');
   var sheetBrecha = document.getElementById('sheetBrecha');
+  var sheetDate = document.getElementById('sheetDate');
+  var sheetBcvDelta = document.getElementById('sheetBcvDelta');
+  var sheetEurDelta = document.getElementById('sheetEurDelta');
+  var sheetUsdtDelta = document.getElementById('sheetUsdtDelta');
+  var sheetPromedioDelta = document.getElementById('sheetPromedioDelta');
   var sheetRows = document.querySelectorAll('.sheet-row');
 
   var state = {
@@ -534,6 +581,8 @@
     eur: null,
     usdt: null,
     referencia: null,
+    cambio: null,
+    updatedAt: null,
     fecha: null,
     lastEdited: 'usd',
     activeCurrency: 'usd'
@@ -571,6 +620,37 @@
     } catch (e) {
       return '';
     }
+  }
+
+  function fmtSheetDate(iso) {
+    try {
+      var d = new Date(iso);
+      var weekday = new Intl.DateTimeFormat('es-VE', { weekday: 'long' }).format(d);
+      weekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+      var resto = new Intl.DateTimeFormat('es-VE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+      return weekday + ', ' + resto;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function renderDelta(el, change) {
+    if (!change) {
+      el.textContent = '—';
+      el.classList.remove('up', 'down');
+      return;
+    }
+    if (change.abs === 0 && change.pct === 0) {
+      el.textContent = 'Sin cambios';
+      el.classList.remove('up', 'down');
+      return;
+    }
+    var subiendo = change.abs > 0;
+    el.classList.toggle('up', subiendo);
+    el.classList.toggle('down', !subiendo);
+    var flecha = subiendo ? '▲' : '▼';
+    var signo = subiendo ? '+' : '-';
+    el.textContent = flecha + ' ' + fmtPct(Math.abs(change.pct)) + ' (' + signo + fmtBs(Math.abs(change.abs)) + ' Bs)';
   }
 
   function setStatus(text, isAlert) {
@@ -673,11 +753,16 @@
   }
 
   function openSheet() {
+    sheetDate.textContent = state.updatedAt ? fmtSheetDate(state.updatedAt) : '—';
     sheetBcv.textContent = state.usd ? fmtBs(state.usd) + ' Bs' : '—';
     sheetEur.textContent = state.eur ? fmtBs(state.eur) + ' Bs' : '—';
     sheetUsdt.textContent = state.usdt ? fmtBs(state.usdt) + ' Bs' : '—';
     sheetPromedio.textContent = state.referencia && state.referencia.promedio ? fmtBs(state.referencia.promedio) + ' Bs' : '—';
     sheetBrecha.textContent = state.referencia && state.referencia.brecha_pct != null ? fmtPct(state.referencia.brecha_pct) : '—';
+    renderDelta(sheetBcvDelta, state.cambio && state.cambio.usd);
+    renderDelta(sheetEurDelta, state.cambio && state.cambio.eur);
+    renderDelta(sheetUsdtDelta, state.cambio && state.cambio.usdt);
+    renderDelta(sheetPromedioDelta, state.cambio && state.cambio.promedio);
     updateSheetHighlight();
     sheetOverlay.classList.add('open');
   }
@@ -711,6 +796,8 @@
     state.eur = data.eur;
     state.usdt = data.usdt;
     state.referencia = data.referencia || null;
+    state.cambio = data.cambio || null;
+    state.updatedAt = data.updatedAt || null;
     state.fecha = data.fecha;
 
     if (!hasUserInput) {
@@ -767,7 +854,9 @@
         eur: json.bcv.eur,
         usdt: json.usdt ? json.usdt.promedio : null,
         fecha: json.bcv.fecha,
-        referencia: json.referencia || null
+        referencia: json.referencia || null,
+        cambio: json.cambio || null,
+        updatedAt: json.meta ? json.meta.updated_at : null
       };
       saveCache(data);
       applyRate(data, true);

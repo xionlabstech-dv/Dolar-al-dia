@@ -92,6 +92,16 @@ async function getCached(env) {
   return raw ? JSON.parse(raw) : null;
 }
 
+function computeChange(current, prev) {
+  if (current == null || prev == null || prev === 0) return null;
+  const abs = current - prev;
+  const pct = (abs / prev) * 100;
+  return {
+    abs: Math.round(abs * 100) / 100,
+    pct: Math.round(pct * 100) / 100,
+  };
+}
+
 async function refreshRates(env) {
   const [bcvResult, usdtResult] = await Promise.allSettled([
     fetchBCV(),
@@ -104,8 +114,6 @@ async function refreshRates(env) {
   const usdt = usdtResult.status === 'fulfilled' ? usdtResult.value : previous?.usdt ?? null;
 
   // Referencia: promedio entre BCV y USDT, y la brecha porcentual entre ambos.
-  // Solo se calcula si tenemos los dos valores; si falta alguno, queda null
-  // en vez de inventar un numero con datos parciales.
   const referencia =
     bcv && bcv.usd != null && usdt && usdt.promedio != null
       ? {
@@ -114,10 +122,20 @@ async function refreshRates(env) {
         }
       : null;
 
+  // Cambio respecto a la ultima lectura guardada (lo que la app muestra
+  // como flecha verde/roja + porcentaje debajo de cada moneda).
+  const cambio = {
+    usd: computeChange(bcv?.usd, previous?.bcv?.usd),
+    eur: computeChange(bcv?.eur, previous?.bcv?.eur),
+    usdt: computeChange(usdt?.promedio, previous?.usdt?.promedio),
+    promedio: computeChange(referencia?.promedio, previous?.referencia?.promedio),
+  };
+
   const payload = {
     bcv,
     usdt,
     referencia,
+    cambio,
     meta: {
       updated_at: new Date().toISOString(),
       bcv_ok: bcvResult.status === 'fulfilled',

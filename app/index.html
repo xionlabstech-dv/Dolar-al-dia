@@ -423,6 +423,121 @@
   .sheet-row.highlight .sheet-row-value{ color: #171200; }
   .sheet-row.highlight .sheet-row-delta{ color: #171200; opacity: 0.75; }
 
+  .sheet-row-edit{
+    align-self: flex-end;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .sheet-row-edit svg{ width: 13px; height: 13px; }
+
+  .sheet-row.highlight .sheet-row-edit{ border-color: #171200; color: #171200; }
+
+  .edit-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 50;
+  }
+
+  .edit-overlay.open{
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .edit-modal{
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    transform: scale(0.96);
+    transition: transform .2s ease;
+  }
+
+  .edit-overlay.open .edit-modal{ transform: scale(1); }
+
+  .edit-title{
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+
+  .edit-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-2);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+  }
+
+  .edit-fixed{
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .edit-input{
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--mono);
+    font-size: 17px;
+    color: var(--accent);
+    text-align: right;
+  }
+
+  .edit-actions{
+    display: flex;
+    gap: 10px;
+  }
+
+  .edit-btn{
+    flex: 1;
+    border-radius: 10px;
+    padding: 11px 0;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+  }
+
+  .edit-btn-cancel{
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+  }
+
+  .edit-btn-accept{
+    background: var(--accent);
+    color: #171200;
+  }
+
   :focus-visible{
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -536,6 +651,32 @@
       </div>
       <div class="sheet-row-delta" id="sheetPromedioDelta">—</div>
     </button>
+    <div class="sheet-row" id="rowPersonalizada" data-currency="personalizada" role="button" tabindex="0">
+      <div class="sheet-row-main">
+        <span class="sheet-row-label">Personalizada</span>
+        <span class="sheet-row-value" id="sheetPersonalizada">—</span>
+      </div>
+      <div class="sheet-row-delta" id="sheetPersonalizadaDelta">—</div>
+      <button type="button" class="sheet-row-edit" id="editPersonalizadaBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        Editar
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="edit-overlay" id="editOverlay">
+  <div class="edit-modal">
+    <p class="edit-title">Coloca la tasa que deseas usar</p>
+    <div class="edit-row">
+      <span class="edit-fixed">$1 =</span>
+      <input type="text" inputmode="decimal" id="customRateInput" class="edit-input" placeholder="0" autocomplete="off" />
+      <span class="edit-fixed">Bs</span>
+    </div>
+    <div class="edit-actions">
+      <button type="button" class="edit-btn edit-btn-cancel" id="editCancelBtn">Cancelar</button>
+      <button type="button" class="edit-btn edit-btn-accept" id="editAcceptBtn">Aceptar</button>
+    </div>
   </div>
 </div>
 
@@ -545,12 +686,14 @@
 (function () {
   var API_URL = 'https://dolar-al-dia-api.xionlabstech.workers.dev/api/tasas';
   var STORAGE_KEY = 'dolaraldia:lastRate';
+  var CUSTOM_RATE_KEY = 'dolaraldia:customRate';
 
   var CURRENCIES = {
     usd: { label: 'Dólar BCV', unitLabel: 'Dólares' },
     eur: { label: 'Euro', unitLabel: 'Euros' },
     usdt: { label: 'USDT (promedio)', unitLabel: 'USDT' },
-    promedio: { label: 'Promedio', unitLabel: 'Promedio' }
+    promedio: { label: 'Promedio', unitLabel: 'Promedio' },
+    personalizada: { label: 'Personalizada', unitLabel: 'Personalizada' }
   };
 
   var usdInput = document.getElementById('usdInput');
@@ -568,6 +711,13 @@
   var sheetEur = document.getElementById('sheetEur');
   var sheetUsdt = document.getElementById('sheetUsdt');
   var sheetPromedio = document.getElementById('sheetPromedio');
+  var sheetPersonalizada = document.getElementById('sheetPersonalizada');
+  var sheetPersonalizadaDelta = document.getElementById('sheetPersonalizadaDelta');
+  var editPersonalizadaBtn = document.getElementById('editPersonalizadaBtn');
+  var editOverlay = document.getElementById('editOverlay');
+  var customRateInput = document.getElementById('customRateInput');
+  var editCancelBtn = document.getElementById('editCancelBtn');
+  var editAcceptBtn = document.getElementById('editAcceptBtn');
   var sheetBrecha = document.getElementById('sheetBrecha');
   var sheetDate = document.getElementById('sheetDate');
   var sheetBcvDelta = document.getElementById('sheetBcvDelta');
@@ -584,6 +734,7 @@
     cambio: null,
     updatedAt: null,
     fecha: null,
+    customRate: null,
     lastEdited: 'usd',
     activeCurrency: 'usd'
   };
@@ -597,6 +748,9 @@
   function getActiveRate() {
     if (state.activeCurrency === 'promedio') {
       return state.referencia ? state.referencia.promedio : null;
+    }
+    if (state.activeCurrency === 'personalizada') {
+      return state.customRate;
     }
     return state[state.activeCurrency];
   }
@@ -746,6 +900,56 @@
     });
   });
 
+  function loadCustomRate() {
+    try {
+      var raw = localStorage.getItem(CUSTOM_RATE_KEY);
+      var val = raw ? parseFloat(raw) : null;
+      return Number.isFinite(val) && val > 0 ? val : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveCustomRate(val) {
+    try {
+      localStorage.setItem(CUSTOM_RATE_KEY, String(val));
+    } catch (e) {}
+  }
+
+  function openEditModal() {
+    customRateInput.value = state.customRate ? fmtBs(state.customRate) : '';
+    editOverlay.classList.add('open');
+    customRateInput.focus();
+  }
+
+  function closeEditModal() {
+    editOverlay.classList.remove('open');
+  }
+
+  editPersonalizadaBtn.addEventListener('click', function () {
+    openEditModal();
+  });
+
+  editCancelBtn.addEventListener('click', closeEditModal);
+
+  editOverlay.addEventListener('click', function (e) {
+    if (e.target === editOverlay) closeEditModal();
+  });
+
+  editAcceptBtn.addEventListener('click', function () {
+    var val = parseFloat(customRateInput.value.replace(',', '.'));
+    if (!Number.isFinite(val) || val <= 0) {
+      customRateInput.focus();
+      return;
+    }
+    state.customRate = val;
+    saveCustomRate(val);
+    closeEditModal();
+    selectCurrency('personalizada');
+  });
+
+  state.customRate = loadCustomRate();
+
   function updateSheetHighlight() {
     sheetRows.forEach(function (row) {
       row.classList.toggle('highlight', row.getAttribute('data-currency') === state.activeCurrency);
@@ -758,6 +962,9 @@
     sheetEur.textContent = state.eur ? fmtBs(state.eur) + ' Bs' : '—';
     sheetUsdt.textContent = state.usdt ? fmtBs(state.usdt) + ' Bs' : '—';
     sheetPromedio.textContent = state.referencia && state.referencia.promedio ? fmtBs(state.referencia.promedio) + ' Bs' : '—';
+    sheetPersonalizada.textContent = state.customRate ? fmtBs(state.customRate) + ' Bs' : '—';
+    sheetPersonalizadaDelta.textContent = state.customRate ? 'Definida por ti' : 'Toca "Editar" para definirla';
+    sheetPersonalizadaDelta.classList.remove('up', 'down');
     sheetBrecha.textContent = state.referencia && state.referencia.brecha_pct != null ? fmtPct(state.referencia.brecha_pct) : '—';
     renderDelta(sheetBcvDelta, state.cambio && state.cambio.usd);
     renderDelta(sheetEurDelta, state.cambio && state.cambio.eur);
@@ -772,6 +979,11 @@
   }
 
   function selectCurrency(currency) {
+    if (currency === 'personalizada' && state.customRate == null) {
+      closeSheet();
+      openEditModal();
+      return;
+    }
     state.activeCurrency = currency;
     pillLabel.textContent = CURRENCIES[currency].label;
     topLabel.textContent = CURRENCIES[currency].unitLabel;
@@ -786,7 +998,8 @@
     if (e.target === sheetOverlay) closeSheet();
   });
   sheetRows.forEach(function (row) {
-    row.addEventListener('click', function () {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('.sheet-row-edit')) return;
       selectCurrency(row.getAttribute('data-currency'));
     });
   });

@@ -8,6 +8,6 @@ compatibility_date = "2026-08-01"
 binding = "RATES_KV"
 id = "89925570929c4b25b4bff9e1e1d23745"
 
-# Refresca BCV + USDT cada 15 minutos.
+# Refresca BCV + USDT cada hora.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["0 * * * *"]

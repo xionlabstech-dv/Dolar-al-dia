@@ -102,6 +102,17 @@ function computeChange(current, prev) {
   };
 }
 
+function todayCaracas() {
+  // Formato 'en-CA' da YYYY-MM-DD, que se puede comparar como texto directamente.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Caracas' }).format(new Date());
+}
+
+function fechaSoloDia(fechaIso) {
+  // bcv.fecha llega como "2026-08-31T00:00:00-04:00"; nos quedamos con la fecha.
+  if (!fechaIso) return null;
+  return fechaIso.slice(0, 10);
+}
+
 async function refreshRates(env) {
   const [bcvResult, usdtResult] = await Promise.allSettled([
     fetchBCV(),
@@ -110,10 +121,42 @@ async function refreshRates(env) {
 
   const previous = await getCached(env);
 
-  const bcv = bcvResult.status === 'fulfilled' ? bcvResult.value : previous?.bcv ?? null;
+  const latestBcv = bcvResult.status === 'fulfilled' ? bcvResult.value : null;
   const usdt = usdtResult.status === 'fulfilled' ? usdtResult.value : previous?.usdt ?? null;
 
-  // Referencia: promedio entre BCV y USDT, y la brecha porcentual entre ambos.
+  // --- Logica de vigente vs proxima ---
+  // El BCV publica de tarde la tasa que rige desde el proximo dia habil. Mientras
+  // esa fecha no llegue, se guarda como "proxima" sin tocar la vigente que usa
+  // el conversor.
+  let vigente = previous?.bcv ?? null;
+  let proxima = previous?.proxima_tasa ?? null;
+
+  if (latestBcv) {
+    const hoy = todayCaracas();
+    const fechaLatest = fechaSoloDia(latestBcv.fecha);
+    const fechaVigente = vigente ? fechaSoloDia(vigente.fecha) : null;
+
+    if (!vigente) {
+      // Primera vez que corre el Worker: no hay vigente todavia.
+      vigente = latestBcv;
+      proxima = null;
+    } else if (fechaLatest === fechaVigente) {
+      // Misma tasa de siempre, solo se refresca el objeto.
+      vigente = latestBcv;
+    } else if (fechaLatest && fechaLatest > hoy) {
+      // Fecha futura: ya publicada, pero todavia no es hoy.
+      proxima = latestBcv;
+    } else if (fechaLatest && fechaLatest <= hoy && fechaLatest > fechaVigente) {
+      // La fecha de hoy ya alcanzo (o paso) la de la proxima: se asciende.
+      vigente = latestBcv;
+      proxima = null;
+    }
+    // Cualquier otro caso (fecha mas vieja que la vigente, dato raro) se ignora
+    // para no retroceder con un dato malo.
+  }
+
+  const bcv = vigente;
+
   const referencia =
     bcv && bcv.usd != null && usdt && usdt.promedio != null
       ? {
@@ -122,8 +165,6 @@ async function refreshRates(env) {
         }
       : null;
 
-  // Cambio respecto a la ultima lectura guardada (lo que la app muestra
-  // como flecha verde/roja + porcentaje debajo de cada moneda).
   const cambio = {
     usd: computeChange(bcv?.usd, previous?.bcv?.usd),
     eur: computeChange(bcv?.eur, previous?.bcv?.eur),
@@ -133,6 +174,7 @@ async function refreshRates(env) {
 
   const payload = {
     bcv,
+    proxima_tasa: proxima,
     usdt,
     referencia,
     cambio,

@@ -252,7 +252,25 @@
 
   .status-text.alert{ color: var(--alert); }
 
-  .status svg{ width: 15px; height: 15px; color: var(--accent); flex-shrink: 0; }
+  .status-icon-btn{
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: -4px;
+    line-height: 0;
+    color: var(--muted);
+    cursor: default;
+    flex-shrink: 0;
+  }
+
+  .status-icon-btn svg{ width: 15px; height: 15px; }
+
+  .status-icon-btn:not(:disabled){
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  .status-text.peek{ color: var(--accent); }
 
   .footnote{
     font-size: 12px;
@@ -601,7 +619,10 @@
 
   <div class="status">
     <span class="status-text" id="statusText">Cargando tasa…</span>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    <button type="button" class="status-icon-btn" id="statusIconBtn" disabled aria-label="Tasa BCV">
+      <svg class="icon-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <svg class="icon-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
   </div>
 
   <p class="footnote">Tasa oficial <b>BCV</b> vía la infraestructura de Xion Labs. Sin publicidad, sin cuentas. Si no hay internet, se muestra el último dato guardado en este teléfono.</p>
@@ -699,6 +720,9 @@
   var usdInput = document.getElementById('usdInput');
   var bsInput = document.getElementById('bsInput');
   var statusText = document.getElementById('statusText');
+  var statusIconBtn = document.getElementById('statusIconBtn');
+  var iconCal = statusIconBtn.querySelector('.icon-cal');
+  var iconBack = statusIconBtn.querySelector('.icon-back');
   var clearBtn = document.getElementById('clearBtn');
   var chips = document.querySelectorAll('.chip');
   var toast = document.getElementById('toast');
@@ -735,6 +759,10 @@
     updatedAt: null,
     fecha: null,
     customRate: null,
+    proximaTasa: null,
+    peeking: false,
+    normalStatusText: '',
+    normalStatusAlert: false,
     lastEdited: 'usd',
     activeCurrency: 'usd'
   };
@@ -751,6 +779,10 @@
     }
     if (state.activeCurrency === 'personalizada') {
       return state.customRate;
+    }
+    if (state.peeking && state.proximaTasa) {
+      if (state.activeCurrency === 'usd') return state.proximaTasa.usd;
+      if (state.activeCurrency === 'eur') return state.proximaTasa.eur;
     }
     return state[state.activeCurrency];
   }
@@ -808,9 +840,60 @@
   }
 
   function setStatus(text, isAlert) {
-    statusText.textContent = text;
-    statusText.classList.toggle('alert', !!isAlert);
+    state.normalStatusText = text;
+    state.normalStatusAlert = !!isAlert;
+    if (!state.peeking) {
+      statusText.textContent = text;
+      statusText.classList.toggle('alert', !!isAlert);
+    }
   }
+
+  function updateProximaIndicator() {
+    if (state.peeking) {
+      iconCal.style.display = 'none';
+      iconBack.style.display = '';
+      statusIconBtn.disabled = false;
+      statusIconBtn.setAttribute('aria-label', 'Volver a la tasa vigente');
+    } else if (state.proximaTasa) {
+      iconCal.style.display = '';
+      iconBack.style.display = 'none';
+      statusIconBtn.disabled = false;
+      statusIconBtn.setAttribute('aria-label', 'Ver tasa proxima disponible');
+    } else {
+      iconCal.style.display = '';
+      iconBack.style.display = 'none';
+      statusIconBtn.disabled = true;
+      statusIconBtn.setAttribute('aria-label', 'Tasa BCV');
+    }
+  }
+
+  function enterPeek() {
+    if (!state.proximaTasa) return;
+    state.peeking = true;
+    var fechaProxima = state.proximaTasa.fecha ? fmtFecha(state.proximaTasa.fecha) : '';
+    statusText.textContent = 'Próxima BCV: ' + fmtBs(state.proximaTasa.usd) + ' Bs · vigente ' + fechaProxima;
+    statusText.classList.remove('alert');
+    statusText.classList.add('peek');
+    updateProximaIndicator();
+    recompute(state.lastEdited);
+  }
+
+  function exitPeek() {
+    state.peeking = false;
+    statusText.textContent = state.normalStatusText || '';
+    statusText.classList.remove('peek');
+    statusText.classList.toggle('alert', !!state.normalStatusAlert);
+    updateProximaIndicator();
+    recompute(state.lastEdited);
+  }
+
+  statusIconBtn.addEventListener('click', function () {
+    if (state.peeking) {
+      exitPeek();
+    } else {
+      enterPeek();
+    }
+  });
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -1012,6 +1095,13 @@
     state.cambio = data.cambio || null;
     state.updatedAt = data.updatedAt || null;
     state.fecha = data.fecha;
+    state.proximaTasa = data.proximaTasa || null;
+
+    if (state.peeking && !state.proximaTasa) {
+      // La proxima desaparecio (se aplico o se retiro) mientras el usuario
+      // la estaba viendo -- se vuelve a la vigente sin dejarlo a mitad de nada.
+      exitPeek();
+    }
 
     if (!hasUserInput) {
       var rate = getActiveRate();
@@ -1028,6 +1118,7 @@
     } else {
       setStatus('Sin conexión · último dato: ' + fechaTxt, true);
     }
+    updateProximaIndicator();
   }
 
   function loadCached() {
@@ -1069,7 +1160,8 @@
         fecha: json.bcv.fecha,
         referencia: json.referencia || null,
         cambio: json.cambio || null,
-        updatedAt: json.meta ? json.meta.updated_at : null
+        updatedAt: json.meta ? json.meta.updated_at : null,
+        proximaTasa: json.proxima_tasa || null
       };
       saveCache(data);
       applyRate(data, true);

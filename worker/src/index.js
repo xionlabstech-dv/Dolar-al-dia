@@ -86,6 +86,29 @@ async function fetchUSDT(env) {
   };
 }
 
+// --- Historico BCV (consulta por fecha especifica) ---
+// Fuente: bcv.today, archivos JSON estaticos servidos por GitHub Pages,
+// sin autenticacion ni limite de consultas real. Cada fecha, una vez
+// consultada, se guarda para siempre en KV (el pasado no cambia), asi
+// que la segunda vez que alguien pida el mismo dia es instantaneo y no
+// vuelve a golpear la fuente externa.
+async function fetchHistorico(env, fecha) {
+  const cacheKey = `historico:${fecha}`;
+  const cached = await env.RATES_KV.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const data = await fetchWithTimeout(`https://bcv.today/api/history/${fecha}.json`, {}, 8000);
+
+  const resultado = {
+    usd: data.USD ?? null,
+    eur: data.EUR ?? null,
+    fecha: data.date || fecha,
+  };
+
+  await env.RATES_KV.put(cacheKey, JSON.stringify(resultado));
+  return resultado;
+}
+
 // --- Caché ---
 async function getCached(env) {
   const raw = await env.RATES_KV.get(CACHE_KEY);
@@ -216,6 +239,19 @@ export default {
       // navegador, porque su único propósito es traer un dato nuevo de verdad.
       const fresh = await refreshRates(env);
       return json(fresh, 200, 'no-store');
+    }
+
+    if (url.pathname === '/api/tasas/historico') {
+      const fecha = url.searchParams.get('fecha');
+      if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        return json({ error: 'Parametro fecha invalido. Formato esperado: YYYY-MM-DD' }, 400);
+      }
+      try {
+        const resultado = await fetchHistorico(env, fecha);
+        return json(resultado);
+      } catch (err) {
+        return json({ error: 'No se pudo obtener la tasa historica: ' + String(err) }, 502);
+      }
     }
 
     return json({ error: 'Ruta no encontrada' }, 404);

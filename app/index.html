@@ -563,6 +563,96 @@
     color: #171200;
   }
 
+  .calendar-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+    z-index: 50;
+  }
+
+  .calendar-overlay.open{
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .calendar-modal{
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    transform: scale(0.96);
+    transition: transform .2s ease;
+  }
+
+  .calendar-overlay.open .calendar-modal{ transform: scale(1); }
+
+  .calendar-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .calendar-title{
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    text-transform: capitalize;
+  }
+
+  .calendar-weekdays{
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 6px;
+  }
+
+  .calendar-weekdays span{
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .calendar-grid{
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .calendar-day{
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .calendar-day:hover{ background: var(--surface-2); }
+
+  .calendar-day.today{
+    border: 1px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .calendar-day.muted{
+    color: var(--line);
+    cursor: default;
+    pointer-events: none;
+  }
+
   :focus-visible{
     outline: 2px solid var(--accent);
     outline-offset: 2px;
@@ -630,7 +720,21 @@
       <svg class="icon-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <svg class="icon-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
     </button>
-    <input type="date" id="historicoDateInput" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;" aria-hidden="true" />
+  </div>
+
+  <div class="calendar-overlay" id="calendarOverlay">
+    <div class="calendar-modal">
+      <div class="calendar-header">
+        <p class="calendar-title" id="calendarTitle">—</p>
+        <button type="button" class="sheet-close" id="calendarCloseBtn" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
   </div>
 
   <p class="footnote">Tasa oficial <b>BCV</b>. Sin publicidad, sin cuentas. Si no hay internet, se muestra el último dato guardado en este teléfono.</p>
@@ -734,7 +838,10 @@
   var statusIconBtn = document.getElementById('statusIconBtn');
   var iconCal = statusIconBtn.querySelector('.icon-cal');
   var iconBack = statusIconBtn.querySelector('.icon-back');
-  var historicoDateInput = document.getElementById('historicoDateInput');
+  var calendarOverlay = document.getElementById('calendarOverlay');
+  var calendarTitle = document.getElementById('calendarTitle');
+  var calendarGrid = document.getElementById('calendarGrid');
+  var calendarCloseBtn = document.getElementById('calendarCloseBtn');
   var clearBtn = document.getElementById('clearBtn');
   var chips = document.querySelectorAll('.chip');
   var toast = document.getElementById('toast');
@@ -904,25 +1011,65 @@
     recompute(state.lastEdited);
   }
 
-  function openHistoricoPicker() {
-    var hoy = new Date();
-    var maxStr = hoy.toISOString().slice(0, 10);
-    var primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
-    historicoDateInput.min = primerDiaMes;
-    historicoDateInput.max = maxStr;
-    historicoDateInput.value = '';
-    if (historicoDateInput.showPicker) {
-      try {
-        historicoDateInput.showPicker();
-        return;
-      } catch (e) {}
-    }
-    historicoDateInput.click();
+  function pad2(n) {
+    return n < 10 ? '0' + n : String(n);
   }
 
-  historicoDateInput.addEventListener('change', function () {
-    var fecha = historicoDateInput.value;
-    if (!fecha) return;
+  var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  function buildCalendar() {
+    var hoy = new Date();
+    var year = hoy.getFullYear();
+    var month = hoy.getMonth();
+    var todayDate = hoy.getDate();
+    var firstWeekday = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    calendarTitle.textContent = MESES[month] + ' ' + year;
+    calendarGrid.innerHTML = '';
+
+    for (var i = 0; i < firstWeekday; i++) {
+      calendarGrid.appendChild(document.createElement('span'));
+    }
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'calendar-day';
+      btn.textContent = String(d);
+
+      if (d > todayDate) {
+        btn.classList.add('muted');
+        btn.disabled = true;
+      } else {
+        if (d === todayDate) btn.classList.add('today');
+        var fechaStr = year + '-' + pad2(month + 1) + '-' + pad2(d);
+        btn.setAttribute('data-fecha', fechaStr);
+        btn.addEventListener('click', function () {
+          var f = this.getAttribute('data-fecha');
+          closeCalendar();
+          consultarHistorico(f);
+        });
+      }
+      calendarGrid.appendChild(btn);
+    }
+  }
+
+  function openHistoricoPicker() {
+    buildCalendar();
+    calendarOverlay.classList.add('open');
+  }
+
+  function closeCalendar() {
+    calendarOverlay.classList.remove('open');
+  }
+
+  calendarCloseBtn.addEventListener('click', closeCalendar);
+  calendarOverlay.addEventListener('click', function (e) {
+    if (e.target === calendarOverlay) closeCalendar();
+  });
+
+  function consultarHistorico(fecha) {
     var textoPrevio = statusText.textContent;
     statusText.textContent = 'Consultando ' + fecha + '…';
     fetch(HISTORICO_URL + '?fecha=' + fecha)
@@ -939,12 +1086,12 @@
         statusText.textContent = textoPrevio;
         showToast('No se pudo consultar esa fecha');
       });
-  });
+  }
 
   function enterHistorico() {
     state.peeking = false;
     state.viewingHistorico = true;
-    var fechaTxt = state.historico.fecha ? fmtFecha(state.historico.fecha) : historicoDateInput.value;
+    var fechaTxt = state.historico.fecha ? fmtFecha(state.historico.fecha) : '';
     statusText.textContent = 'Consultando ' + fechaTxt + ': ' + fmtBs(state.historico.usd) + ' Bs';
     statusText.classList.remove('alert');
     statusText.classList.add('peek');

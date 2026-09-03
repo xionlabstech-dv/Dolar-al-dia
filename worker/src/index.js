@@ -97,7 +97,7 @@ async function fetchHistorico(env, fecha) {
   const cached = await env.RATES_KV.get(cacheKey);
   if (cached) return JSON.parse(cached);
 
-  const data = await fetchWithTimeout(`https://bcv.today/api/history/${fecha}.json`, {}, 8000);
+  const data = await fetchWithTimeout(`https://bcv.today/api/v1/history/${fecha}.json`, {}, 8000);
 
   const resultado = {
     usd: data.USD ?? null,
